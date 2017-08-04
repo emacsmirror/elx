@@ -202,7 +202,7 @@ General Public Licen[sc]e[.,:;]? \
 \\(?:GPL \\)?\
 version \\(?2:[0-9.]*[0-9]\\)[.,:;]?\
 \\(?: of the Licen[sc]e[.,:;]?\\)?\
-\\(?3: or \\(?:(at your option) \\)?any later version\\)?"))
+\\(?3: or \\(?:(?at your option)? \\)?any later version\\)?"))
 
 (defconst elx-bsd-permission-statement-regexp
   (replace-regexp-in-string
@@ -314,6 +314,16 @@ licensed under the Creative Commons \
    ;; To view a copy of this license, visit"
    ))
 
+(defconst elx-wtf-permission-statement-regexp
+  (replace-regexp-in-string
+   "\s" "[\s\t\n;]+"
+   ;; This program is
+   "\
+free software. It comes without any warranty, to \
+the extent permitted by applicable law\\. You can redistribute it \
+and/or modify it under the terms of the Do What The Fuck You Want \
+To Public License, Version 2, as published by Sam Hocevar\\."))
+
 (defconst elx-gnu-license-keyword-regexp "\
 \\(?:GNU \\(?1:Lesser \\| Library \\|Affero \\|Free \\)? General Public Licen[sc]e\
 \\|\\(?4:[laf]?gpl\\)[- ]?\
@@ -332,12 +342,18 @@ licensed under the Creative Commons \
     ("BSD-3-clause"  . "BSD Licen[sc]e 2\\.0")
     ("BSD-3-clause"  . "\\(Revised\\|New\\|Modified\\) BSD\\( Licen[sc]e\\)?")
     ("BSD-3-clause"  . "BSD[-v]?3")
+    ("BSD-3-clause"  . "BSD[- ]3-clause\\( license\\)?")
     ("BSD-2-clause"  . "BSD[-v]?2")
+    ("BSD-2-clause"  . "BSD[- ]2-clause\\( license\\)?")
     ("BSD-2-clause"  . "Simplified BSD\\( Licen[sc]e\\)?")
+    ("BSD-2-clause"  . "The same license terms as Ruby")
     ("MIT"           . "mit")
     ("as-is"         . "as-?is")
     ("public-domain" . "public[- ]domain")
-    ("WTFPL"         . "WTFPL, grab your copy here: http://sam.zoy.org/wtfpl/")
+    ("WTFPL-2"       . "WTFPL .+?http://sam\\.zoy\\.org/wtfpl")
+    ("WTFPL"         . "WTFPL")
+    ("CeCILL-B"      . "CeCILL-B")
+    ("MS-PL"         . "MS-PL")
     ))
 
 (defconst elx-non-gnu-license-keyword-regexp "\
@@ -346,14 +362,31 @@ licensed under the Creative Commons \
 (defconst elx-permission-statement-alist
   `(("Apache-2.0"    . "^;.* Apache Licen[sc]e, Version 2\\.0")
     ("MIT"           . "^;.* mit licen[sc]e")
+    ("MIT"           . "^;; This file is free software (MIT License)$")
     ("GPL-3+"        . "^;; Licensed under the same terms as Emacs\\.$")
+    ("GPL-3+"        . "^;; This file may be distributed under the same terms as GNU Emacs\\.$")
+    ("GPL-3+"        . "^;; Licensed under the same terms as Org-mode")
+    ("GPL-3+"        . "^;; Standard GPL v3 or higher license applies\\.")
+    ("GPL-3"         . "^;; This file is free software (GPLv3 License)$")
+    ("GPL-3"         . "^;; This software is licensed under the GPL version 3")
+    ("GPL-2"         . "^;; This software can be redistributed\\. GPL v2 applies\\.$")
+    ("GPL"           . "^;; Released under the GPL")
+    ("GPL"           . "^;; Licensed under the GPL")
     ("WTFPL-2"       . "do what the fuck you want to public licen[sc]e,? version 2")
     ("WTFPL"         . "do what the fuck you want to")
     ("WTFPL"         . "wtf public licen[sc]e")
     ("BSD-2-clause"  . "^;; Simplified BSD Licen[sc]e$")
+    ("BSD-3-clause"  . "^;; 3-clause \"new bsd\"")
     ("Artistic-2.0"  . "^;; .*Artistic Licen[sc]e 2\\.0")
+    ("CeCILL-B"      . "^;; It is a free software under the CeCILL-B license\\.$")
+    ("MS-PL"         . "^;; This code is distributed under the MS-Public License")
+    ("MS-PL"         . "licensed under the Ms-PL")
     ("public-domain" . "^;.*in\\(to\\)? the public[- ]domain")
-    ("public-domain" . "^;+ +Public domain\\.")
+    ("public-domain" . "^;+ +Public domain")
+    ("public-domain" . "^;+ This program belongs to the public domain")
+    ("public-domain" . "^;; This file is public domain")
+    ("as-is"         . "\"as is\"*")
+    ("as-is"         . "\\*as is\\*")
     ("as-is"         . "^;.* \\(\\(this\\|the\\) software is \\)\
 \\(provided\\|distributed\\) \
 \\(by the \\(author?\\|team\\|copyright holders\\)\\( and contributors\\)? \\)?\
@@ -432,13 +465,14 @@ of typos in the statement, or for a number of other reasons."
                              ("Attribution-NonCommercial-ShareAlike" "BY-NC-SA")
                              ("Attribution-NonCommercial-NoDerivs"   "BY-NC-ND"))
                            version)))
+            (and (re-search-forward elx-wtf-permission-statement-regexp bound t)
+                 "WTFPL-2")
             (-when-let (license (lm-header "Licen[sc]e"))
               (and (string-match elx-gnu-license-keyword-regexp license)
                    (format-gnu-abbrev license)))
             (elx-licensee dir)
             ;; FIXME Github uses the above tool too.  But for
             ;; some reason they get better results than we do.
-            (prog1 nil (message "B"))
             (and package-name
                  (elx-licensee-github package-name))
             (car (cl-find-if (pcase-lambda (`(,_ . ,re))
@@ -454,7 +488,7 @@ of typos in the statement, or for a number of other reasons."
                  ;; "<other license>", while the GPL is mentioned in
                  ;; a way the above code does not recognize.  Return
                  ;; nil instead of "<other license>" in such cases.
-                 (not (re-search-forward elx-gnu-license-keyword-regexp bound t))
+                 ;; (not (re-search-forward elx-gnu-license-keyword-regexp bound t))
                  (car (cl-find-if (pcase-lambda (`(,_ . ,re))
                                     (re-search-forward re bound t))
                                   elx-permission-statement-alist))))))))
