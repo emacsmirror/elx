@@ -331,6 +331,8 @@ licensed under the Creative Commons \
   '(("Apache-2.0"    . "apache-2\\.0")
     ("BSD-3-clause"  . "BSD Licen[sc]e 2\\.0")
     ("BSD-3-clause"  . "\\(Revised\\|New\\|Modified\\) BSD\\( Licen[sc]e\\)?")
+    ("BSD-3-clause"  . "BSD[-v]?3")
+    ("BSD-2-clause"  . "BSD[-v]?2")
     ("BSD-2-clause"  . "Simplified BSD\\( Licen[sc]e\\)?")
     ("MIT"           . "mit")
     ("as-is"         . "as-?is")
@@ -402,53 +404,41 @@ of typos in the statement, or for a number of other reasons."
                              ("Free "    "FDL")
                              (`nil       "GPL")))
                          (and version (concat "-" version))
-                         (and later "+"))))
-              (format-bsd-abbrev
-               (&optional object)
-               (format "BSD-%s-clause"
-                       (cond ((match-string 4 object) 4)
-                             ((match-string 3 object) 3)
-                             (t                       2))))
-              (format-mit-abbrev
-               (&optional object)
-               (format "MIT (%s)"
-                       (if (match-string 1 object) "expat" "x11")))
-              (format-isc-abbrev
-               (&optional object)
-               (format "ISC (%s)"
-                       (if (match-string 1 object) "and/or" "and")))
-              (format-cc-abbrev
-               (&optional object)
-               (let ((license (match-string 1 object))
-                     (version (match-string 2 object)))
-                 (format "CC-%s-%s"
-                         (pcase license
-                           ("Attribution"                          "BY")
-                           ("Attribution-ShareAlike"               "BY-SA")
-                           ("Attribution-NonCommercial"            "BY-NC")
-                           ("Attribution-NoDerivs"                 "BY-ND")
-                           ("Attribution-NonCommercial-ShareAlike" "BY-NC-SA")
-                           ("Attribution-NonCommercial-NoDerivs"   "BY-NC-ND"))
-                         version))))
+                         (and later "+")))))
       (let ((bound nil) ; (lm-code-start)) some put it at eof
             (case-fold-search t))
         (or (and (re-search-forward elx-gnu-permission-statement-regexp bound t)
                  (format-gnu-abbrev))
             (and (re-search-forward elx-bsd-permission-statement-regexp bound t)
-                 (format-bsd-abbrev))
+                 (format "BSD-%s-clause"
+                         (cond ((match-string 4) 4)
+                               ((match-string 3) 3)
+                               (t                2))))
             (and (re-search-forward elx-mit-permission-statement-regexp bound t)
-                 (format-mit-abbrev))
+                 (format "MIT (%s)"
+                         (if (match-string 1) "expat" "x11")))
             (and (re-search-forward elx-isc-permission-statement-regexp bound t)
-                 (format-isc-abbrev))
+                 (format "ISC (%s)"
+                         (if (match-string 1) "and/or" "and")))
             (and (re-search-forward elx-cc-permission-statement-regexp bound t)
-                 (format-cc-abbrev))
+                 (let ((license (match-string 1))
+                       (version (match-string 2)))
+                   (format "CC-%s-%s"
+                           (pcase license
+                             ("Attribution"                          "BY")
+                             ("Attribution-ShareAlike"               "BY-SA")
+                             ("Attribution-NonCommercial"            "BY-NC")
+                             ("Attribution-NoDerivs"                 "BY-ND")
+                             ("Attribution-NonCommercial-ShareAlike" "BY-NC-SA")
+                             ("Attribution-NonCommercial-NoDerivs"   "BY-NC-ND"))
+                           version)))
             (-when-let (license (lm-header "Licen[sc]e"))
-              (or (and (string-match elx-gnu-license-keyword-regexp license)
-                       (format-gnu-abbrev license))))
+              (and (string-match elx-gnu-license-keyword-regexp license)
+                   (format-gnu-abbrev license)))
             (elx-licensee dir)
-            ;; FIXME Github used the above tool too.  But for some
-            ;; reason they get better results than I do.  So ask them
-            ;; too.
+            ;; FIXME Github uses the above tool too.  But for
+            ;; some reason they get better results than we do.
+            (prog1 nil (message "B"))
             (and package-name
                  (elx-licensee-github package-name))
             (car (cl-find-if (pcase-lambda (`(,_ . ,re))
@@ -477,7 +467,10 @@ of typos in the statement, or for a number of other reasons."
     (elx--licensee-abbrev
      (substring (cl-find-if (lambda (s) (string-prefix-p "License: " s))
                             lines)
-                9))))
+                9)
+     (substring (cl-find-if (lambda (s) (string-prefix-p "License file: " s))
+                            lines)
+                14))))
 
 (defun elx-licensee-github (name)
   (-when-let (pkg (epkg name))
@@ -493,7 +486,7 @@ of typos in the statement, or for a number of other reasons."
               (cdr (assq 'name it))
               (elx--licensee-abbrev it)))))
 
-(defun elx--licensee-abbrev (license)
+(defun elx--licensee-abbrev (license &optional file)
   (pcase license
     ("Apache License 2.0"                          "Apache-2.0")
     ("Artistic License 2.0"                        "Artistic-2.0")
@@ -506,7 +499,12 @@ of typos in the statement, or for a number of other reasons."
     ("GNU General Public License v3.0"             "GPL-3")
     ("GNU Lesser General Public License v2.1"      "LGPL-2.1")
     ("GNU Lesser General Public License v3.0"      "LGPL-3")
-    ("ISC License"                                 "ISC")
+    ("ISC License"
+     (with-temp-buffer
+       (insert-file-contents file)
+       (re-search-forward
+        "Permission to use, copy, modify,? and\\(/or\\)? distribute")
+       (if (match-beginning 1) "ISC (and/or)" "ISC (and)")))
     ("MIT License"                                 "MIT")
     ("Mozilla Public License 2.0"                  "MPL-2")
     ("The Unlicense"                               "unlicense")
