@@ -162,7 +162,7 @@ consisting only of whitespace are converted to empty lines."
         (and (not (string-blank-p str))
              str)))))
 
-;;; Extract and Update Package-Requires
+;;; Extract Package-Requires
 
 (defun elx-package-requires (&optional file extra)
   "Extract the value of the Package-Requires header of the specified package.
@@ -177,39 +177,6 @@ single line, or the prefix used on continuation lines."
                       (package-read-from-string
                        (string-join lines " ")))))
       (if extra (list value beg end indent) value))))
-
-(defun elx-update-package-requires (&optional file updates indent noerror)
-  (pcase-let* ((`(,value ,beg ,end ,i) (elx-package-requires file t))
-               (indent (or i (and indent (make-string indent ?\s)))))
-    (if (not value)
-        (unless noerror
-          (error "Cannot update Package-Requires; cannot be found"))
-      (setq value (elx--update-dependencies value updates))
-      (save-excursion
-        (goto-char beg)
-        (delete-region beg end)
-        (insert ";; Package-Requires: (")
-        (setq value (mapcar (##format "%S" %) value))
-        (if (not indent)
-            (insert (string-join value " ") ")\n")
-          (insert "\n")
-          (while-let ((line (pop value)))
-            (insert ";;" indent line (if value "\n" ")\n"))))))))
-
-(defun elx--update-dependencies (value updates)
-  (pcase-dolist (`(,pkg ,ver) updates)
-    (when (alist-get pkg value)
-      (setf (alist-get pkg value)
-            (list ver))))
-  (compat-call sort value
-               (lambda (a b)
-                 (pcase (list a b)
-                   (`(emacs ,_) t)
-                   (`(,_ emacs) nil)
-                   (`(compat ,_) t)
-                   (`(,_ compat) nil)
-                   (_ (string< a b))))
-               :lessp '< :key #'car))
 
 ;;; Extract Pages
 
